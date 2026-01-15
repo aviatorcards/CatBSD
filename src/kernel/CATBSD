@@ -1,0 +1,73 @@
+# CatBSD Kernel Configuration
+# Based on FreeBSD GENERIC with CatBSD-specific enhancements
+
+include GENERIC
+
+ident   CATBSD
+
+# CatBSD-specific options
+options     CATBSD              # CatBSD marker
+options     DARWIN_COMPAT       # Darwin compatibility layer
+
+# Enhanced debugging (remove for production)
+options     KDB                 # Kernel debugger support
+options     KDB_TRACE           # Print stack trace on panic
+options     DDB                 # Interactive kernel debugger
+options     INVARIANTS          # Runtime consistency checks
+options     INVARIANT_SUPPORT   # Extra sanity checks
+options     WITNESS             # Lock order checking
+
+# Performance and tracing
+options     DTRACE              # DTrace support
+options     KDTRACE_HOOKS       # Kernel DTrace hooks
+
+# Filesystems
+options     ZFS                 # ZFS filesystem
+options     NULLFS              # NULL filesystem (for jails)
+options     TMPFS               # Efficient temporary filesystem
+
+# Security enhancements
+options     MAC                 # Mandatory Access Control
+options     CAPABILITY_MODE     # Capsicum capability mode
+options     CAPABILITIES        # Capsicum capabilities
+
+# Networking
+options     IPSEC               # IP security
+options     IPSEC_SUPPORT       # IPsec support
+device      pf                  # Packet filter
+device      pflog               # PF logging
+
+# Darwin compatibility devices (placeholders)
+# These will be implemented as compatibility shims
+# device    darwin_mach       # Mach compatibility
+# device    darwin_iokit      # IOKit compatibility
+
+# Additional useful devices
+device      virtio              # VirtIO support (for VMs)
+device      virtio_pci          # VirtIO PCI device
+device      virtio_blk          # VirtIO block device
+device      virtio_scsi         # VirtIO SCSI device
+device      virtio_balloon      # VirtIO memory balloon
+device      vtnet               # VirtIO network device
+
+# Console and terminal
+device      vt                  # Virtual terminal
+device      vt_vga              # VGA terminal
+device      vt_efifb            # EFI framebuffer
+
+# USB support
+device      uhci                # UHCI USB controller
+device      ohci                # OHCI USB controller
+device      ehci                # EHCI USB controller
+device      xhci                # XHCI USB controller
+device      usb                 # USB bus
+device      ukbd                # USB keyboard
+device      umass               # USB mass storage
+
+# Sound (for future multimedia support)
+device      sound               # Generic sound support
+device      snd_hda             # Intel High Definition Audio
+
+# Miscellaneous
+options     GEOM_LABEL          # GEOM-based disk labeling
+options     PRINTF_BUFR_SIZE=128 # Prevent printf output being interspersed

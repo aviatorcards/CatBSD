@@ -1,0 +1,49 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.dylib
+
+# Executables
+*-demo/*-demo
+!*-demo/*.c
+!*-demo/*.h
+!*-demo/Makefile
+!*-demo/README.md
+
+# Test files
+test*.txt
+test-*
+*.zip
+
+# macOS
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Editor
+.vscode/
+.idea/
+*.sublime-*
+
+# Temporary files
+/tmp/
+*.tmp
+*.log
+
+# Source trees (large downloads)
+sources/freebsd/
+sources/darwin/
+
+# VM images
+*.iso
+*.img
+*.qcow2
+*.vdi
+*.vmdk
+
+# Personal notes
+notes.txt
+TODO.txt
