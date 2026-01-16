@@ -8,7 +8,7 @@
 #include <string.h>
 #include <sys/utsname.h>
 
-#define CATBSD_VERSION "0.1.0-alpha"
+#define CATBSD_VERSION "0.2.0-alpha"
 #define CATBSD_BUILD "24A1"
 #define CATBSD_NAME "CatBSD Darwin Utilities Toolkit"
 

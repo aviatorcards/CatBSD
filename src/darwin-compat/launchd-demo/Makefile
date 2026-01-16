@@ -14,7 +14,7 @@ LIBS=		../shims/mach_port.o ../shims/darwin_syscalls.o
 all: $(PROG)
 
 $(PROG): $(OBJS) $(LIBS)
-	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS) -lpthread
 
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@

@@ -1,8 +1,17 @@
 # Makefile for defaults-demo
 
 CC=		cc
-CFLAGS=		-Wall -Wextra -I/opt/homebrew/opt/libxml2/include/libxml2
-LDFLAGS=	-L/opt/homebrew/opt/libxml2/lib
+CFLAGS=		-Wall -Wextra
+
+# Platform-specific libxml2 paths
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    CFLAGS += -I/opt/homebrew/opt/libxml2/include/libxml2
+    LDFLAGS = -L/opt/homebrew/opt/libxml2/lib -lxml2
+else ifeq ($(UNAME_S),FreeBSD)
+    CFLAGS += -I/usr/local/include/libxml2
+    LDFLAGS = -L/usr/local/lib -lxml2
+endif
 LIBS=		-lxml2
 
 PROG=		defaults-demo

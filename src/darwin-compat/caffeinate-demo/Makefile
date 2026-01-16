@@ -7,14 +7,12 @@ LDFLAGS=	-L../shims
 PROG=		caffeinate-demo
 SRCS=		caffeinate-demo.c
 OBJS=		$(SRCS:.c=.o)
-
-# Link against our shim library
-LIBS=		../shims/darwin_syscalls.o
+SHIM_LIB=	../shims/libdarwin_compat.a
 
 all: $(PROG)
 
-$(PROG): $(OBJS) $(LIBS)
-	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+$(PROG): $(OBJS) $(SHIM_LIB)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(SHIM_LIB) -lpthread
 
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@
