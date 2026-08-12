@@ -1,9 +1,9 @@
 # Makefile for plutil-demo
 
 CC=		cc
-CFLAGS=		-Wall -Wextra -I/opt/homebrew/opt/libxml2/include/libxml2
-LDFLAGS=	-L/opt/homebrew/opt/libxml2/lib
-LIBS=		-lxml2
+CFLAGS=		-Wall -Wextra $(shell pkg-config --cflags libxml-2.0 2>/dev/null)
+LDFLAGS=	$(shell pkg-config --libs-only-L libxml-2.0 2>/dev/null)
+LIBS=		$(shell pkg-config --libs-only-l libxml-2.0 2>/dev/null || echo -lxml2)
 
 PROG=		plutil-demo
 SRCS=		plutil-demo.c
