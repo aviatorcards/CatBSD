@@ -32,7 +32,16 @@ test: $(PROG)
 	@./$(PROG) list | grep -q "No daemons" && echo "PASS: list (empty)" || { echo "FAIL: list"; exit 1; }
 	@echo ""
 	@echo "=== Test 3: Start daemon (exit 0) ==="
-	@./$(PROG) start com.catbsd.test > /dev/null && echo "PASS: start" || { echo "FAIL: start"; exit 1; }
+	@LOGFILE=$$(mktemp); \
+		./$(PROG) start com.catbsd.test > "$$LOGFILE" 2>&1; STATUS=$$?; \
+		cat "$$LOGFILE"; \
+		if [ $$STATUS -ne 0 ]; then rm -f "$$LOGFILE"; echo "FAIL: start"; exit 1; fi; \
+		echo "PASS: start"; \
+		DAEMON_PID=$$(sed -nE 's/.*PID: ([0-9]+).*/\1/p' "$$LOGFILE"); \
+		rm -f "$$LOGFILE"; \
+		if [ -n "$$DAEMON_PID" ]; then \
+			kill "$$DAEMON_PID" 2>/dev/null && echo "  (cleaned up daemon child pid $$DAEMON_PID)"; \
+		fi
 	@echo ""
 	@echo "=== Test 4: Unknown command returns non-zero ==="
 	@./$(PROG) bogus 2>&1 | grep -q "Unknown command" && echo "PASS: error handling" || { echo "FAIL: error handling"; exit 1; }
