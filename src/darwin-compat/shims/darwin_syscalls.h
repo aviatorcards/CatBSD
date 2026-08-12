@@ -45,7 +45,27 @@ size_t darwin_vm_page_size(void);
  * Process functions
  */
 
-/* Get process info */
+/*
+ * The only implemented flavor: basic BSD-visible process info, modeled
+ * after Darwin's PROC_PIDTBSDINFO. Other flavor values are rejected.
+ */
+#define DARWIN_PROC_PIDTBSDINFO 3
+
+typedef struct darwin_proc_bsdinfo {
+  int32_t pbi_pid;
+  int32_t pbi_ppid;
+  uint32_t pbi_uid;
+  uint32_t pbi_status; /* platform process state, e.g. SRUN/SSLEEP */
+  char pbi_comm[64];
+} darwin_proc_bsdinfo_t;
+
+/*
+ * Get process info, mirroring Darwin's proc_pidinfo(). Only
+ * DARWIN_PROC_PIDTBSDINFO is implemented; `buffer` must point at a
+ * darwin_proc_bsdinfo_t of at least `buffersize` bytes. `arg` is unused
+ * (real proc_pidinfo overloads it per-flavor; no other flavor exists here).
+ * Returns the number of bytes written on success, -1 on error (errno set).
+ */
 int darwin_proc_pidinfo(int pid, int flavor, uint64_t arg, void *buffer,
                         int buffersize);
 

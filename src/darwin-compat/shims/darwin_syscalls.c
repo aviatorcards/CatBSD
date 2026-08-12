@@ -3,11 +3,15 @@
  */
 
 #include "darwin_syscalls.h"
+#include <errno.h>
 #include <pthread.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
 #ifdef __FreeBSD__
 #include <pthread_np.h>
+#endif
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#include <sys/user.h>
 #endif
 #include <string.h>
 #include <unistd.h>
@@ -80,20 +84,64 @@ size_t darwin_vm_page_size(void) { return (size_t)getpagesize(); }
 /*
  * Get process info
  * Darwin: proc_pidinfo() syscall
- * FreeBSD: Use sysctl or procstat
- *
- * This is a simplified stub - full implementation would need
- * to handle different info flavors
+ * FreeBSD/macOS: KERN_PROC_PID sysctl, whose kinfo_proc layout differs
+ * per platform, normalized here into darwin_proc_bsdinfo_t.
  */
 int darwin_proc_pidinfo(int pid, int flavor, uint64_t arg, void *buffer,
                         int buffersize) {
-  /* Placeholder implementation */
-  (void)pid;
-  (void)flavor;
   (void)arg;
-  (void)buffer;
-  (void)buffersize;
 
-  /* TODO: Implement using sysctl */
+  if (buffer == NULL || pid < 0) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  if (flavor != DARWIN_PROC_PIDTBSDINFO) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  if ((size_t)buffersize < sizeof(darwin_proc_bsdinfo_t)) {
+    errno = ENOSPC;
+    return -1;
+  }
+
+#if defined(__APPLE__) || defined(__FreeBSD__)
+  int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, pid};
+  struct kinfo_proc kp;
+  size_t len = sizeof(kp);
+
+  memset(&kp, 0, sizeof(kp));
+  if (sysctl(mib, 4, &kp, &len, NULL, 0) != 0) {
+    return -1;
+  }
+  if (len == 0) {
+    /* No such process: sysctl succeeds but returns nothing. */
+    errno = ESRCH;
+    return -1;
+  }
+
+  darwin_proc_bsdinfo_t info;
+  memset(&info, 0, sizeof(info));
+
+#if defined(__APPLE__)
+  info.pbi_pid = kp.kp_proc.p_pid;
+  info.pbi_ppid = kp.kp_eproc.e_ppid;
+  info.pbi_uid = kp.kp_eproc.e_ucred.cr_uid;
+  info.pbi_status = (uint32_t)kp.kp_proc.p_stat;
+  strlcpy(info.pbi_comm, kp.kp_proc.p_comm, sizeof(info.pbi_comm));
+#else /* __FreeBSD__ */
+  info.pbi_pid = kp.ki_pid;
+  info.pbi_ppid = kp.ki_ppid;
+  info.pbi_uid = kp.ki_uid;
+  info.pbi_status = (uint32_t)kp.ki_stat;
+  strlcpy(info.pbi_comm, kp.ki_comm, sizeof(info.pbi_comm));
+#endif
+
+  memcpy(buffer, &info, sizeof(info));
+  return (int)sizeof(info);
+#else
+  errno = ENOTSUP;
   return -1;
+#endif
 }
