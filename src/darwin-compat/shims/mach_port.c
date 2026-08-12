@@ -386,6 +386,125 @@ kern_return_t mach_msg_receive(mach_port_t port, void *msg, size_t len,
 }
 
 /*
+ * Wait on a set of ports at once.
+ *
+ * Each port is already backed by its own kqueue; kqueue descriptors are
+ * themselves pollable via EVFILT_READ (a kqueue looks "readable" to
+ * another kqueue whenever it has pending events), so a temporary
+ * "supervisor" kqueue watching every port's fd gives real multi-port
+ * blocking without polling.
+ *
+ * The supervisor's wakeups are only ever treated as a hint, never as
+ * proof that a given port has a message: mach_msg_receive's own fast
+ * path can dequeue a message without reading back the EVFILT_USER event
+ * that announced it (it only touches kqueue when the queue was already
+ * empty), which leaves that port's kqueue looking permanently
+ * "readable" to an external observer even after the message is gone.
+ * So every wakeup here -- real or stale -- just triggers a fresh,
+ * authoritative scan of the actual per-port queues, exactly like
+ * mach_msg_receive does with its own single port.
+ */
+kern_return_t mach_port_wait_any(const mach_port_t *ports, int count,
+                                 int *ready_index_out, int timeout_ms) {
+  if (ports == NULL || count <= 0 || ready_index_out == NULL) {
+    return KERN_INVALID_ARGUMENT;
+  }
+
+  for (int i = 0; i < count; i++) {
+    if (ports[i] == MACH_PORT_NULL || ports[i] == MACH_PORT_DEAD) {
+      return KERN_INVALID_NAME;
+    }
+  }
+
+  int supervisor = kqueue();
+  if (supervisor < 0) {
+    return KERN_FAILURE;
+  }
+
+  struct kevent *changes = malloc(sizeof(*changes) * (size_t)count);
+  if (changes == NULL) {
+    close(supervisor);
+    return KERN_NO_SPACE;
+  }
+  for (int i = 0; i < count; i++) {
+    EV_SET(&changes[i], ports[i], EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, NULL);
+  }
+  int reg_ret = kevent(supervisor, changes, count, NULL, 0, NULL);
+  free(changes);
+  if (reg_ret < 0) {
+    close(supervisor);
+    return KERN_FAILURE;
+  }
+
+  struct timespec deadline;
+  int has_deadline = 0;
+  if (timeout_ms >= 0) {
+    clock_gettime(CLOCK_MONOTONIC, &deadline);
+    deadline.tv_sec += timeout_ms / 1000;
+    deadline.tv_nsec += (long)(timeout_ms % 1000) * 1000000L;
+    if (deadline.tv_nsec >= 1000000000L) {
+      deadline.tv_sec += 1;
+      deadline.tv_nsec -= 1000000000L;
+    }
+    has_deadline = 1;
+  }
+
+  for (;;) {
+    for (int i = 0; i < count; i++) {
+      port_entry_t *entry = port_entry_get(ports[i], 0);
+      if (entry == NULL) {
+        continue;
+      }
+      pthread_mutex_lock(&entry->lock);
+      int has_msg = (entry->msg_head != NULL);
+      pthread_mutex_unlock(&entry->lock);
+      if (has_msg) {
+        close(supervisor);
+        *ready_index_out = i;
+        return KERN_SUCCESS;
+      }
+    }
+
+    struct timespec remaining;
+    struct timespec *remaining_ptr = NULL;
+    if (has_deadline) {
+      struct timespec now;
+
+      clock_gettime(CLOCK_MONOTONIC, &now);
+      remaining.tv_sec = deadline.tv_sec - now.tv_sec;
+      remaining.tv_nsec = deadline.tv_nsec - now.tv_nsec;
+      if (remaining.tv_nsec < 0) {
+        remaining.tv_sec -= 1;
+        remaining.tv_nsec += 1000000000L;
+      }
+      if (remaining.tv_sec < 0 ||
+          (remaining.tv_sec == 0 && remaining.tv_nsec <= 0)) {
+        close(supervisor);
+        return KERN_TIMED_OUT;
+      }
+      remaining_ptr = &remaining;
+    }
+
+    struct kevent triggered;
+    int ret = kevent(supervisor, NULL, 0, &triggered, 1, remaining_ptr);
+
+    if (ret < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      close(supervisor);
+      return KERN_FAILURE;
+    }
+    if (ret == 0) {
+      close(supervisor);
+      return KERN_TIMED_OUT;
+    }
+    /* Woke up -- loop back to the authoritative queue scan above rather
+     * than trusting triggered.ident directly. */
+  }
+}
+
+/*
  * Get error string for Mach error code
  */
 const char *mach_error_string(kern_return_t error) {

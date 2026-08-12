@@ -88,6 +88,19 @@ int mach_port_has_right(mach_port_t port, mach_port_t name, int right);
 kern_return_t mach_msg_send(mach_port_t port, void *msg, size_t len);
 kern_return_t mach_msg_receive(mach_port_t port, void *msg, size_t len, int timeout);
 
+/*
+ * Port sets: block until at least one of `ports[0..count)` has a message
+ * queued, or `timeout_ms` elapses (negative = wait forever). On
+ * KERN_SUCCESS, *ready_index_out is the index into `ports` of a port
+ * that's ready -- follow up with mach_msg_receive() on ports[*ready_index_out]
+ * to actually drain it. This is what CATBSD_PORT_RIGHT_PORT_SET names:
+ * the ability to wait on many ports at once, the way a real init system
+ * waits on every supervised daemon's port in one loop instead of one
+ * blocking receive per port.
+ */
+kern_return_t mach_port_wait_any(const mach_port_t *ports, int count,
+                                 int *ready_index_out, int timeout_ms);
+
 /* Utility functions */
 const char* mach_error_string(kern_return_t error);
 

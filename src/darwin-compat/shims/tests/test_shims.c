@@ -4,6 +4,7 @@
  */
 
 #include <assert.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -146,6 +147,94 @@ void test_port_rights(void) {
   printf("  All port rights tests passed!\n\n");
 }
 
+typedef struct {
+  mach_port_t port;
+  int delay_ms;
+  const char *msg;
+} delayed_sender_args_t;
+
+static void *delayed_sender(void *arg) {
+  delayed_sender_args_t *args = (delayed_sender_args_t *)arg;
+  usleep((useconds_t)args->delay_ms * 1000);
+  mach_msg_send(args->port, (void *)args->msg, strlen(args->msg) + 1);
+  return NULL;
+}
+
+/* mach_port_wait_any is what CATBSD_PORT_RIGHT_PORT_SET actually enables:
+ * blocking on several ports at once instead of one receive per port. */
+void test_port_wait_any(void) {
+  printf("Testing mach_port_wait_any (port sets)...\n");
+
+  const int count = 4;
+  mach_port_t ports[4];
+  for (int i = 0; i < count; i++) {
+    assert(mach_port_allocate(&ports[i]) == KERN_SUCCESS);
+  }
+
+  /* Case 1: a message already queued before waiting -- the fast path. */
+  const char *early_msg = "already-here";
+  assert(mach_msg_send(ports[2], (void *)early_msg,
+                       strlen(early_msg) + 1) == KERN_SUCCESS);
+
+  int ready = -1;
+  kern_return_t ret = mach_port_wait_any(ports, count, &ready, 200);
+  assert(ret == KERN_SUCCESS);
+  assert(ready == 2);
+  printf("  \xE2\x9C\x93 wait_any returns immediately for an "
+         "already-queued message on port index %d\n", ready);
+
+  char buf[32] = {0};
+  assert(mach_msg_receive(ports[ready], buf, sizeof(buf), 100) ==
+         KERN_SUCCESS);
+  assert(strcmp(buf, early_msg) == 0);
+  printf("  \xE2\x9C\x93 message content intact after wait_any + "
+         "receive\n");
+
+  /* Case 2: real blocking wait -- a background thread sends after a
+   * delay, on a different port index than case 1, to prove wait_any
+   * is actually waking on new activity rather than re-detecting stale
+   * state left over from case 1. */
+  delayed_sender_args_t sender_args = {ports[1], 80, "delayed-hello"};
+  pthread_t thread;
+  assert(pthread_create(&thread, NULL, delayed_sender, &sender_args) == 0);
+
+  uint64_t start = darwin_absolute_time();
+  ready = -1;
+  ret = mach_port_wait_any(ports, count, &ready, 2000);
+  uint64_t elapsed_ms = (darwin_absolute_time() - start) / 1000000ULL;
+  pthread_join(thread, NULL);
+
+  assert(ret == KERN_SUCCESS);
+  assert(ready == 1);
+  /* Should wake close to the 80ms send delay, nowhere near the 2000ms
+   * timeout -- proves this is a real wakeup, not a delayed timeout. */
+  assert(elapsed_ms < 1000);
+  printf("  \xE2\x9C\x93 wait_any woke for a message sent from another "
+         "thread ~%llums later, correctly on port index %d\n",
+         (unsigned long long)elapsed_ms, ready);
+
+  memset(buf, 0, sizeof(buf));
+  assert(mach_msg_receive(ports[ready], buf, sizeof(buf), 100) ==
+         KERN_SUCCESS);
+  assert(strcmp(buf, "delayed-hello") == 0);
+
+  /* Case 3: nothing sent anywhere -- must time out, not hang or
+   * false-positive on a port. */
+  ready = -1;
+  start = darwin_absolute_time();
+  ret = mach_port_wait_any(ports, count, &ready, 50);
+  elapsed_ms = (darwin_absolute_time() - start) / 1000000ULL;
+  assert(ret == KERN_TIMED_OUT);
+  assert(elapsed_ms >= 40 && elapsed_ms < 2000);
+  printf("  \xE2\x9C\x93 wait_any times out after ~%llums when no port "
+         "has a message\n", (unsigned long long)elapsed_ms);
+
+  for (int i = 0; i < count; i++) {
+    assert(mach_port_deallocate(ports[i]) == KERN_SUCCESS);
+  }
+  printf("  All port set tests passed!\n\n");
+}
+
 /* Test Darwin syscall compatibility */
 void test_darwin_syscalls(void) {
   printf("Testing Darwin syscall compatibility...\n");
@@ -253,6 +342,7 @@ int main(void) {
   test_message_queue_fifo();
   test_receive_timeout();
   test_port_rights();
+  test_port_wait_any();
   test_darwin_syscalls();
   test_proc_pidinfo();
   demo_practical_usage();
