@@ -1,49 +1,101 @@
 # Darwin Component Manifest
 
 **CatBSD Darwin Compatibility Layer**  
-**Last Updated**: January 15, 2026
+**Last Updated**: September 25, 2026
 
 This file tracks all Darwin components imported into CatBSD for integration with FreeBSD.
 
 ## Directory Structure
 
+Present today:
+
 ```
 darwin-compat/
-├── blocks/              # Blocks runtime (LLVM compiler-rt)
-├── libdispatch/         # Grand Central Dispatch
+├── blocks/              # libBlocksRuntime.a  ← imported from LLVM compiler-rt
+│   ├── runtime.c                # Upstream, unmodified
+│   ├── Block.h                  # Upstream, unmodified
+│   ├── Block_private.h          # Upstream, unmodified
+│   ├── config.h                 # CatBSD hand-written (replaces autoconf)
+│   └── tests/
+├── shims/               # libdarwin_compat.a
+│   ├── mach_port.{c,h}          # Mach ports over kqueue
+│   ├── darwin_syscalls.{c,h}    # Darwin syscall equivalents
+│   ├── xpc_shim.{c,h}           # XPC over AF_UNIX
+│   ├── xpc_compat.h             # Darwin-name aliases (non-Apple only)
+│   └── tests/
+├── libdispatch/         # libcatbsd_dispatch.a
+│   ├── dispatch_shim.{c,h}      # GCD subset on pthreads
+│   ├── dispatch_compat.h        # Darwin-name aliases (non-Apple only)
+│   └── tests/
+├── launchd/             # liblaunch.a
+│   ├── plist_lite.{c,h}         # dependency-free XML plist reader
+│   ├── launch_job.{c,h}         # job model + supervision
+│   └── tests/
+├── <name>-demo/         # the Essential 15 utilities
+└── MANIFEST.md          # This file
+```
+
+Planned, once additional swift-corelibs sources are imported:
+
+```
+darwin-compat/
 ├── CoreFoundation/      # Core framework
 ├── libsystem/           # System library compatibility shims
-├── launchd/             # Init system (optional)
-├── patches/             # FreeBSD compatibility patches
-│   ├── blocks/
-│   ├── libdispatch/
-│   ├── CoreFoundation/
-│   └── libsystem/
-└── MANIFEST.md          # This file
+└── patches/             # FreeBSD compatibility patches
+    ├── libdispatch/
+    ├── CoreFoundation/
+    └── libsystem/
 ```
 
 ## Imported Components
 
-| Component    | Version | Source | Import Date | Build Status | Integration Status |
-| ------------ | ------- | ------ | ----------- | ------------ | ------------------ |
-| _(none yet)_ | -       | -      | -           | -            | -                  |
+| Component      | Version | Source | Import Date | Build Status | Integration Status |
+| -------------- | ------- | ------ | ----------- | ------------ | ------------------ |
+| Blocks Runtime | LLVM main (Sep 2026) | [llvm-project/compiler-rt/lib/BlocksRuntime](https://github.com/llvm/llvm-project/tree/main/compiler-rt/lib/BlocksRuntime) | 2026-09-25 | Compiles | Partial — builds and tests pass on macOS; FreeBSD not yet run |
+
+## Clean-room Implementations
+
+Separate from imports: these are CatBSD code written against the documented
+Darwin API surface, not ported Apple source. They exist so the rest of the
+tree has something to build against before the large imports happen, and
+they carry no APSL obligations.
+
+| Component              | Location                     | Covers                                                        | Build Status | Tested                       |
+| ---------------------- | ---------------------------- | ------------------------------------------------------------- | ------------ | ---------------------------- |
+| Mach port shim         | `shims/mach_port.{c,h}`      | Ports, queued messages, rights, port sets                     | Compiles     | macOS ✓                      |
+| Darwin syscall shim    | `shims/darwin_syscalls.{c,h}`| `mach_absolute_time`, thread names, page size, `proc_pidinfo`  | Compiles     | macOS ✓                      |
+| XPC shim               | `shims/xpc_shim.{c,h}`       | Typed messages, named services, correlated replies, async      | Compiles     | Linux (TSan+ASan) ✓, macOS ✓ |
+| libdispatch subset     | `libdispatch/`               | Queues, barriers, groups, semaphores, once, apply, timers      | Compiles     | Linux (TSan+ASan) ✓, macOS ✓ |
+| liblaunch              | `launchd/`                   | Job plists, supervision, KeepAlive, throttling, socket activation | Compiles  | Linux (ASan) ✓, macOS ✓     |
+
+The Mach and syscall shims use kqueue and BSD `sysctl`, so they build on
+macOS and FreeBSD only. The three newer components (XPC, libdispatch,
+liblaunch) are POSIX-only — all five test suites now pass on macOS.
+
+Each ships a Darwin-name compatibility header (`xpc_compat.h`,
+`dispatch_compat.h`) that maps `xpc_*` / `dispatch_*` spellings onto the
+prefixed symbols on non-Apple targets, so ported sources need an extra
+`#include` rather than a rename pass.
 
 ## Planned Imports
 
 ### Phase 3: High Priority
 
-1. **Blocks Runtime**
-   - Source: LLVM compiler-rt
-   - URL: https://github.com/llvm/llvm-project
-   - Path: `compiler-rt/lib/BlocksRuntime`
-   - Priority: HIGH
-   - Estimated Effort: 1-2 days
+1. ~~**Blocks Runtime**~~ ✓ **Done** (2026-09-25)
+   - Imported from LLVM compiler-rt into `blocks/`
+   - `libBlocksRuntime.a` builds; tests pass on macOS
+   - FreeBSD build pending
 
 2. **libdispatch**
    - Source: swift-corelibs-libdispatch
    - URL: https://github.com/apple/swift-corelibs-libdispatch
    - Priority: HIGH
    - Estimated Effort: 3-5 days
+   - Note: a clean-room subset now exists in `libdispatch/` and covers
+     queues, groups, semaphores, barriers and timer sources. The upstream
+     import is still the right answer for API completeness (dispatch sources
+     on fds, priority bands, `dispatch_io`); it is no longer a blocker for
+     anything else in the tree.
 
 3. **CoreFoundation**
    - Source: swift-corelibs-foundation
@@ -62,6 +114,10 @@ darwin-compat/
    - Source: Apple OSS (or simplified implementation)
    - Priority: MEDIUM
    - Estimated Effort: 7-14 days
+   - Note: the simplified path is underway — `launchd/` supervises jobs from
+     real plists with KeepAlive, throttling and socket activation. Still
+     missing before this is an init system: a control protocol (the XPC shim
+     is the transport), a domain/session model, and PID 1 behaviour.
 
 ## Component Status Definitions
 

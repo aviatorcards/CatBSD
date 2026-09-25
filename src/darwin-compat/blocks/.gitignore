@@ -1,0 +1,4 @@
+# Build artifacts
+*.o
+*.a
+tests/test_blocks
