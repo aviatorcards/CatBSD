@@ -1,0 +1,5 @@
+# Build artifacts
+*.o
+*.a
+tests/test_launch
+tests/test_launchctl
