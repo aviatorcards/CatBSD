@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.catbsd.getty.plist — console login shell
+
+  Provides a login shell on the system console.  In a real deployment this
+  would invoke getty(8) or login(1); here it runs a plain /bin/sh so the
+  system is usable immediately without a password database.
+
+  RunAtLoad=true means catbsd-init presents a shell prompt at boot.
+  KeepAlive=true means it respawns when the user exits the shell.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.catbsd.getty</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>--login</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>1</integer>
+
+    <key>WorkingDirectory</key>
+    <string>/root</string>
+</dict>
+</plist>

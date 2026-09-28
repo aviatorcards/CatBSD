@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.catbsd.syslog.plist — example syslog-like daemon
+
+  Prints a startup banner and then loops, acting as a stand-in for a
+  real syslog daemon until one is ported.  RunAtLoad=true means catbsd-init
+  starts it automatically at boot.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.catbsd.syslog</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>echo "[catbsd-syslog] started (stub)" ; while true; do sleep 60; done</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+
+    <key>StandardOutPath</key>
+    <string>/var/log/catbsd-syslog.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/var/log/catbsd-syslog.log</string>
+</dict>
+</plist>
