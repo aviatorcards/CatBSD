@@ -15,6 +15,7 @@ build/
 # Test files
 test*.txt
 test-*
+!scripts/test-freebsd.sh
 *.zip
 
 # macOS

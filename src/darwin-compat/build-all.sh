@@ -40,6 +40,12 @@ if [ "${1:-}" = "test" ]; then
         (cd "$lib" && make test)
         echo ""
     done
+    echo "=== launchctl protocol ==="
+    (cd launchd && make test-launchctl)
+    echo ""
+    echo "=== catbsd-init ==="
+    (cd "$SCRIPT_DIR/../catbsd-init" && make test)
+    echo ""
     echo "✓ All library tests passed"
     exit 0
 fi
