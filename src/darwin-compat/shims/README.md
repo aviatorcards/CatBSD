@@ -82,17 +82,73 @@ darwin_pthread_setname_np("worker-thread");
 size_t page_size = darwin_vm_page_size();
 ```
 
-### xpc_shim.h/c (TODO)
+### xpc_shim.h/c
 
 **XPC → Unix Domain Sockets**
 
-Will provide XPC compatibility using Unix domain sockets:
+| Darwin                                  | This shim                                       |
+| --------------------------------------- | ----------------------------------------------- |
+| `xpc_connection_create(name)`           | `connect()` to a per-uid runtime dir socket     |
+| `xpc_connection_create_listener(name)`  | `bind()` + `listen()`, name claimed with `flock` |
+| `xpc_dictionary_*`                      | Typed, ref-counted message dictionary            |
+| `xpc_connection_send_message()`         | Length-prefixed frame over `SOCK_STREAM`         |
+| `..._with_reply_sync()`                 | Correlation id matched against queued traffic    |
+| `xpc_connection_set_event_handler()`    | Reader thread invoking a callback                |
 
-- `xpc_connection_create()` → `socket(AF_UNIX)`
-- `xpc_connection_send_message()` → `send()`
-- `xpc_connection_set_event_handler()` → event loop
+Everything is prefixed `catbsd_xpc_`, because macOS already ships real XPC in
+libSystem — the same collision `mach_port.h` documents for `mach_port_t`.
+Non-Apple targets that want Darwin spelling can include `xpc_compat.h`.
 
-**Status**: Not yet implemented
+**Usage**:
+
+```c
+#include "xpc_shim.h"
+
+int err;
+catbsd_xpc_connection_t c = catbsd_xpc_connection_create("com.catbsd.jobd", &err);
+
+catbsd_xpc_object_t req = catbsd_xpc_dictionary_create();
+catbsd_xpc_dictionary_set_string(req, "op", "status");
+catbsd_xpc_dictionary_set_int64(req, "pid", 4242);
+
+catbsd_xpc_object_t reply = NULL;
+if (catbsd_xpc_connection_send_message_with_reply_sync(c, req, 3000, &reply)
+        == CATBSD_XPC_SUCCESS) {
+    const char *state = catbsd_xpc_dictionary_get_string(reply, "state");
+    /* ... */
+    catbsd_xpc_release(reply);
+}
+catbsd_xpc_release(req);
+catbsd_xpc_connection_release(c);
+```
+
+**Deliberate differences from Darwin XPC**:
+
+- **Getters distinguish absent from zero.** `xpc_dictionary_get_int64()` on
+  Darwin returns 0 for both a missing key and a genuine 0. Here the scalar
+  getters return `CATBSD_XPC_EINVAL` and leave the out-param untouched
+  unless the key exists *and* holds that exact type — a supervisor deciding
+  whether a job set `KeepAlive` needs to tell those apart.
+- **A service name is one path component**, resolved under
+  `$CATBSD_XPC_RUNTIME_DIR` (default `/tmp/catbsd-xpc-<uid>`). Names
+  containing `/` are rejected; an absolute name is used as a literal path.
+- **No object graph.** Dictionaries hold scalars, strings and data — no
+  nested dictionaries or arrays, no fd or endpoint passing.
+- **No bootstrap namespace, no launchd-published services, no
+  entitlements or peer credential checks.** A listener owns its name for as
+  long as it holds the lock; that is the whole security model.
+
+**Stale-name handling**: a bound AF_UNIX path outlives the process that
+created it, so a crashed listener leaves one behind forever. The obvious
+liveness test — connect and see if it succeeds — is actively harmful here:
+on a `SOCK_STREAM` listener the probe connection is queued in the accept
+backlog, so the live owner's next `accept()` returns a dead peer instead of
+its real client. Instead each listener holds an `flock` on a sidecar
+`<socket>.lock` file, which the kernel drops when the holder dies. Same
+question, no side effects.
+
+**Status**: implemented and tested (`tests/test_xpc.c`), clean under TSan
+and ASan.
 
 ## Building
 
@@ -185,8 +241,10 @@ void my_function(void) {
 
 **XPC**:
 
-- Not yet implemented
-- Will be simplified compared to real XPC
+- Flat messages only: no nested dictionaries, arrays, fds or endpoints
+- No bootstrap namespace, entitlements or peer credential checks
+- 1 MiB frame cap (a peer is untrusted input; without a cap a bogus length
+  prefix is an unbounded `malloc`)
 
 ### Future Enhancements
 
@@ -195,10 +253,10 @@ void my_function(void) {
    - Port rights tracking
    - Multi-threaded support
 
-2. **XPC Implementation**
-   - Basic connection management
-   - Message serialization
-   - Event handling
+2. **Richer XPC**
+   - Nested containers (dictionaries and arrays as values)
+   - File descriptor passing via `SCM_RIGHTS`
+   - Peer credentials (`SO_PEERCRED` / `LOCAL_PEERCRED`) for authorization
 
 3. **Additional Syscalls**
    - More complete `proc_pidinfo()`
@@ -209,28 +267,23 @@ void my_function(void) {
 
 ### Unit Tests
 
-Create tests in `tests/` subdirectory:
-
-```c
-// tests/test_mach_port.c
-#include "mach_port.h"
-#include <assert.h>
-
-int main() {
-    mach_port_t port;
-    assert(mach_port_allocate(&port) == KERN_SUCCESS);
-    assert(port != MACH_PORT_NULL);
-    assert(mach_port_deallocate(port) == KERN_SUCCESS);
-    return 0;
-}
-```
-
-Build and run:
-
 ```bash
-cc -I. tests/test_mach_port.c mach_port.c -o test_mach_port
-./test_mach_port
+cd tests && ./run_tests.sh    # builds the library, then both suites
+# or, from this directory:
+make test
 ```
+
+Two binaries, deliberately kept separate so a failure points at one shim
+rather than "the tests":
+
+- `tests/test_shims` — Mach ports (queueing, rights, port sets, timeouts)
+  and the Darwin syscall shims
+- `tests/test_xpc` — XPC dictionaries, wire framing, request/reply
+  correlation, async delivery and error paths
+
+Both assert on observable behaviour rather than return codes alone: a shim
+that "succeeds" while losing bytes, dropping messages or mismatching replies
+would pass a return-code-only suite.
 
 ## Contributing
 
