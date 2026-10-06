@@ -3,7 +3,8 @@
 Tracks which CatBSD components build and pass tests on FreeBSD.
 
 **Last updated**: October 5, 2026 (macOS-only testing so far)  
-**FreeBSD target**: 14.2+ / 14-STABLE / 15-CURRENT (amd64 + arm64/aarch64)
+**FreeBSD target**: 14.5-RELEASE (amd64 — Tier 1 Primary)  
+**Verified Base Image**: `src/freebsd/FreeBSD-14.5-RELEASE-amd64-disc1.iso`  
 
 ---
 

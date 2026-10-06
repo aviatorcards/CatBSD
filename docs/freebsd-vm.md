@@ -5,24 +5,30 @@ on the real target platform.
 
 ---
 
-## Download FreeBSD
+## Local Baseline ISO (Present in Tree)
 
-CatBSD targets modern FreeBSD (14.x+ / 15-CURRENT). You have three choices depending on your stability vs. cutting-edge preference:
+The project currently has the verified official release ISO in `src/freebsd/`:
 
-### Choice 1: FreeBSD 14.2-RELEASE (Standard Stable Base)
-Best for reproducible builds and official binary packages.
+* **File**: `src/freebsd/FreeBSD-14.5-RELEASE-amd64-disc1.iso` (1.32 GB)
+* **Architecture**: `amd64` (x86_64 — Tier 1 Target)
+* **Format**: ISO 9660 bootable disc image
+* **Contents**: Includes full base distribution (`base.txz`, `kernel.txz`, and full source tree `src.txz`)
+
+You do not need to download an ISO if you use this file! Point your VM directly to:
+```bash
+/Users/tristan/Documents/code/CatBSD/src/freebsd/FreeBSD-14.5-RELEASE-amd64-disc1.iso
+```
+
+---
+
+## Alternative Downloads (Snapshots & Other Architectures)
+
+If you need a different architecture or want weekly snapshots:
 
 | Architecture | Image | Size | Use when |
 |---|---|---|---|
-| **arm64** | [FreeBSD-14.2-RELEASE-arm64-aarch64-disc1.iso.xz](https://download.freebsd.org/releases/arm64/aarch64/ISO-IMAGES/14.2/FreeBSD-14.2-RELEASE-arm64-aarch64-disc1.iso.xz) | ~1 GB | Apple Silicon Mac (M1/M2/M3/M4) |
-| **amd64** | [FreeBSD-14.2-RELEASE-amd64-disc1.iso.xz](https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.2/FreeBSD-14.2-RELEASE-amd64-disc1.iso.xz) | ~1 GB | Intel Mac |
-
-### Choice 2: FreeBSD 15-CURRENT / 14-STABLE Snapshots (Cutting Edge)
-If you want the newest LLVM toolchain, latest Apple Silicon / Hypervisor improvements, and pkgbase developments heading toward FreeBSD 15:
-
-* **Weekly Snapshots Directory**: [FreeBSD Snapshots Index](https://download.freebsd.org/snapshots/)
-* **arm64 Snapshot ISOs**: `https://download.freebsd.org/snapshots/arm64/aarch64/ISO-IMAGES/`
-* **amd64 Snapshot ISOs**: `https://download.freebsd.org/snapshots/amd64/amd64/ISO-IMAGES/`
+| **amd64** | `FreeBSD-14.5-RELEASE-amd64-disc1.iso` | 1.3 GB | Primary target (in `src/freebsd/`) |
+| **arm64** | [FreeBSD Snapshots Index](https://download.freebsd.org/snapshots/) | ~1 GB | Apple Silicon native testing |
 
 ### Fast Alternative: Pre-built VM Disk Images
 If you want to skip the installer entirely, FreeBSD publishes ready-to-run raw and QCOW2 images that boot straight to a login prompt:
@@ -40,10 +46,9 @@ xz -d FreeBSD-*.iso.xz
 
 ---
 
-## Option A — UTM (Recommended for Apple Silicon)
+## Option A — UTM (Apple Silicon Mac)
 
-[UTM](https://mac.getutm.app) is free, open-source, and uses Apple's
-Hypervisor framework on Apple Silicon for near-native performance.
+[UTM](https://mac.getutm.app) supports running both native ARM VMs and emulating `x86_64` (`amd64`).
 
 ### Install UTM
 
@@ -52,15 +57,20 @@ brew install --cask utm
 # or download directly from https://mac.getutm.app
 ```
 
-### Create the VM
+### Running the amd64 ISO in UTM:
 
-1. Open UTM → **+** → **Virtualize** (not Emulate)
-2. Select **Other** → Continue
-3. Browse to your `.iso` file → Continue
-4. RAM: **2048 MB** minimum, 4096 MB recommended
-5. Storage: **20 GB**
-6. Name: `FreeBSD 14.2`
-7. **Save** → **Play** ▶
+Since the ISO is **amd64** (`FreeBSD-14.5-RELEASE-amd64-disc1.iso`), select **Emulate** in UTM:
+
+1. Open UTM → **+** → **Emulate**
+2. Operating System: **Other**
+3. Browse to the ISO: `src/freebsd/FreeBSD-14.5-RELEASE-amd64-disc1.iso`
+4. Architecture: **x86_64**
+5. RAM: **4096 MB**, CPU Cores: **4**
+6. Storage: **20 GB**
+7. Name: `FreeBSD 14.5 amd64`
+8. **Save** → **Play** ▶
+
+*(Note: UTM uses QEMU x86_64 emulation under the hood. It compiles slightly slower than native ARM, but runs true 64-bit x86 instructions identical to PC hardware).*
 
 ### Install FreeBSD
 
