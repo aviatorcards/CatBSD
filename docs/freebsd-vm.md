@@ -7,18 +7,31 @@ on the real target platform.
 
 ## Download FreeBSD
 
-Grab the latest stable release (14.x recommended):
+CatBSD targets modern FreeBSD (14.x+ / 15-CURRENT). You have three choices depending on your stability vs. cutting-edge preference:
 
-**FreeBSD 14.2 — direct download links:**
+### Choice 1: FreeBSD 14.2-RELEASE (Standard Stable Base)
+Best for reproducible builds and official binary packages.
 
 | Architecture | Image | Size | Use when |
 |---|---|---|---|
 | **arm64** | [FreeBSD-14.2-RELEASE-arm64-aarch64-disc1.iso.xz](https://download.freebsd.org/releases/arm64/aarch64/ISO-IMAGES/14.2/FreeBSD-14.2-RELEASE-arm64-aarch64-disc1.iso.xz) | ~1 GB | Apple Silicon Mac (M1/M2/M3/M4) |
 | **amd64** | [FreeBSD-14.2-RELEASE-amd64-disc1.iso.xz](https://download.freebsd.org/releases/amd64/amd64/ISO-IMAGES/14.2/FreeBSD-14.2-RELEASE-amd64-disc1.iso.xz) | ~1 GB | Intel Mac |
 
+### Choice 2: FreeBSD 15-CURRENT / 14-STABLE Snapshots (Cutting Edge)
+If you want the newest LLVM toolchain, latest Apple Silicon / Hypervisor improvements, and pkgbase developments heading toward FreeBSD 15:
+
+* **Weekly Snapshots Directory**: [FreeBSD Snapshots Index](https://download.freebsd.org/snapshots/)
+* **arm64 Snapshot ISOs**: `https://download.freebsd.org/snapshots/arm64/aarch64/ISO-IMAGES/`
+* **amd64 Snapshot ISOs**: `https://download.freebsd.org/snapshots/amd64/amd64/ISO-IMAGES/`
+
+### Fast Alternative: Pre-built VM Disk Images
+If you want to skip the installer entirely, FreeBSD publishes ready-to-run raw and QCOW2 images that boot straight to a login prompt:
+* [FreeBSD Official VM Images](https://download.freebsd.org/releases/VM-IMAGES/)
+* Decompress `.qcow2.xz` or `.raw.xz` and import directly into UTM as a drive.
+
 ```bash
 # Decompress after download
-xz -d FreeBSD-14.2-RELEASE-*.iso.xz
+xz -d FreeBSD-*.iso.xz
 ```
 
 > [!TIP]

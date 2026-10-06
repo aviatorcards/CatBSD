@@ -14,7 +14,7 @@ else
     echo "Warning: .catbsd.env not found. Using defaults."
     CATBSD_ROOT="$(pwd)"
     CATBSD_SRC="$CATBSD_ROOT/src"
-    FREEBSD_BRANCH="${FREEBSD_BRANCH:-stable/13}"
+    FREEBSD_BRANCH="${FREEBSD_BRANCH:-stable/14}"
     MACOS_VERSION="${MACOS_VERSION:-10.8.5}"
 fi
 

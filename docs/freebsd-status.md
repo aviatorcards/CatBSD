@@ -2,8 +2,8 @@
 
 Tracks which CatBSD components build and pass tests on FreeBSD.
 
-**Last updated**: September 27, 2026 (macOS-only testing so far)  
-**FreeBSD target**: 14.2-RELEASE (amd64 + arm64/aarch64)
+**Last updated**: October 5, 2026 (macOS-only testing so far)  
+**FreeBSD target**: 14.2+ / 14-STABLE / 15-CURRENT (amd64 + arm64/aarch64)
 
 ---
 
@@ -20,7 +20,7 @@ These are the foundation — they need to work before anything else matters.
 | `launchd/liblaunch` — supervision | ✅ Tests pass | ⬜ Untested | ⬜ Untested | POSIX only |
 | `launchd/launchctl_server` — control | ✅ Tests pass | ⬜ Untested | ⬜ Untested | Depends on xpc_shim |
 
-**Expected result**: All should build and pass on FreeBSD 14.x with the stock
+**Expected result**: All should build and pass on FreeBSD 14.x / 15.x with the stock
 `clang` from base (no pkg installs needed). The Mach port shim uses `kqueue`
 which is *native* to FreeBSD — it should work better there than on macOS.
 

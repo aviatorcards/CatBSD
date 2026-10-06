@@ -114,7 +114,7 @@ export CATBSD_DARWIN="$CATBSD_SRC/darwin-compat"
 
 # Build configuration
 export MACOS_VERSION="10.8.5"
-export FREEBSD_BRANCH="stable/13"
+export FREEBSD_BRANCH="stable/14"
 
 # Compiler settings
 export CC=clang
